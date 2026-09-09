@@ -22,7 +22,7 @@ if [ -z "${_KPI_INPUT_FD}" ]; then
     if [ -e /proc/self/fd/9 ]; then
         # fd 9 already belongs to the consumer (any mode) — don't touch it.
         _KPI_INPUT_FD=""
-    elif exec 9<>/dev/tty 2>/dev/null; then
+    elif { exec 9<>/dev/tty; } 2>/dev/null; then
         _KPI_INPUT_FD=9
     else
         _KPI_INPUT_FD=""
