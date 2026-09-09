@@ -27,11 +27,11 @@ jobs:
       - name: Run unit tests (bash ${{ matrix.bash-version }})
         run: |
           if [ "${{ matrix.bash-version }}" = "4.0" ]; then
-            # bash:4.0 is a minimal Debian-based image with neither git nor
+            # bash:4.0 is a minimal Alpine-based image with neither git nor
             # python3 — both are required by git.bats/json.bats/klipper.bats,
-            # so install them before running the suite.
+            # so install them (via apk, not apt-get) before running the suite.
             docker run --rm -v "$PWD:/work" -w /work bash:4.0 bash -c "
-              apt-get update -qq && apt-get install -y -qq git python3 >/dev/null
+              apk add --no-cache git python3
               test/bats-core/bin/bats \$(ls test/*.bats | grep -v integration.bats)
             "
           else
@@ -54,13 +54,18 @@ jobs:
     container:
       image: debian:bookworm
     steps:
+      - name: Install git (required before checkout — debian:bookworm ships neither)
+        # actions/checkout@v4 needs git for `submodules: recursive`; without
+        # it, checkout falls back to a REST-API tarball download that does
+        # not support submodule recursion and hard-errors.
+        run: apt-get update && apt-get install -y git
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Install bats dependencies
-        # git for potential future preflight.bats needs; python3 because
-        # require_python_min's test calls `command -v python3` and the
-        # bare debian:bookworm image does not include it by default.
-        run: apt-get update && apt-get install -y git python3
+        # python3 because require_python_min's test calls `command -v
+        # python3` and the bare debian:bookworm image does not include it
+        # by default.
+        run: apt-get update && apt-get install -y python3
       - name: Run preflight.bats as root
         run: test/bats-core/bin/bats test/preflight.bats
