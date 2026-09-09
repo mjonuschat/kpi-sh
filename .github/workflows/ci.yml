@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - run: make shellcheck
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bash-version: ["4.0", "5.x"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Run unit tests (bash ${{ matrix.bash-version }})
+        run: |
+          if [ "${{ matrix.bash-version }}" = "4.0" ]; then
+            # bash:4.0 is a minimal Debian-based image with neither git nor
+            # python3 — both are required by git.bats/json.bats/klipper.bats,
+            # so install them before running the suite.
+            docker run --rm -v "$PWD:/work" -w /work bash:4.0 bash -c "
+              apt-get update -qq && apt-get install -y -qq git python3 >/dev/null
+              test/bats-core/bin/bats \$(ls test/*.bats | grep -v integration.bats)
+            "
+          else
+            make test-unit
+          fi
+      - name: Build kpi.sh
+        run: make kpi.sh
+      - name: Verify clean rebuild
+        run: |
+          sha1="$(sha256sum kpi.sh)"
+          rm kpi.sh
+          make kpi.sh
+          sha2="$(sha256sum kpi.sh)"
+          [ "$sha1" = "$sha2" ] || (echo "rebuild is not clean" && exit 1)
+      - name: Run integration tests
+        run: make test-integration
+
+  test-root:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install bats dependencies
+        # git for potential future preflight.bats needs; python3 because
+        # require_python_min's test calls `command -v python3` and the
+        # bare debian:bookworm image does not include it by default.
+        run: apt-get update && apt-get install -y git python3
+      - name: Run preflight.bats as root
+        run: test/bats-core/bin/bats test/preflight.bats
