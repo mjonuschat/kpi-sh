@@ -13,8 +13,8 @@ service_restart_if() {
         fi
     fi
 
-    timeout 30 sudo systemctl restart "$service"
-    local rc=$?
+    local rc=0
+    timeout 30 sudo systemctl restart "$service" || rc=$?
     if [ "$rc" -eq 124 ]; then
         die "service_restart_if: restart timed out after 30s: $service"
     elif [ "$rc" -ne 0 ]; then

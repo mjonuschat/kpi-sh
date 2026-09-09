@@ -59,7 +59,7 @@ backup_dir_timestamped() {
         _kpi_prev_exit_cmd="$(trap() { printf '%s' "$2"; }; eval "$_kpi_prev_exit")"
     fi
 
-    trap 'rm -rf "$staging"; if [ -n "$_kpi_prev_exit_cmd" ]; then eval "$_kpi_prev_exit_cmd"; fi' EXIT
+    trap 'rm -rf "$staging"; if [ "$BASHPID" = "$$" ] && [ -n "$_kpi_prev_exit_cmd" ]; then eval "$_kpi_prev_exit_cmd"; fi' EXIT
     trap 'rm -rf "$staging"; trap - INT; kill -INT "$BASHPID"' INT
     trap 'rm -rf "$staging"; trap - TERM; kill -TERM "$BASHPID"' TERM
 

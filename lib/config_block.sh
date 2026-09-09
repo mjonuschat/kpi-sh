@@ -56,7 +56,7 @@ _kpi_config_block_write() {
     fi
     trap 'rm -f "$tmp"; if [ -n "$_kpi_prev_trap_cmd" ]; then eval "$_kpi_prev_trap_cmd"; fi' EXIT
 
-    tmp="$(mktemp "$(dirname "$resolved").kpi.XXXXXX")" || die "config_block: mktemp failed for $resolved"
+    tmp="$(mktemp "$(dirname "$resolved")/.kpi.XXXXXX")" || die "config_block: mktemp failed for $resolved"
     printf '%s' "$new_content" > "$tmp" || die "config_block: write to temp file failed: $tmp"
     if [ -f "$resolved" ]; then
         _kpi_config_block_chmod_reference "$resolved" "$tmp" \
@@ -164,15 +164,15 @@ config_block_remove() {
     # read the file" (any other nonzero) — `if ! grep ...` alone treats a
     # permission error identically to "not found" and would silently
     # no-op instead of ever reaching the failure checks below.
-    grep -qxF "$start" "$resolved"
-    local grep_rc=$?
+    local grep_rc=0
+    grep -qxF "$start" "$resolved" || grep_rc=$?
     if [ "$grep_rc" -eq 1 ]; then
         return 0
     elif [ "$grep_rc" -ne 0 ]; then
         die "config_block_remove: cannot read $resolved (grep exit $grep_rc)"
     fi
 
-    local new_content
+    local new_content rc=0
     new_content="$(awk -v start="$start" -v end="$end" '
         BEGIN { in_block = 0 }
         {
@@ -188,8 +188,7 @@ config_block_remove() {
             print
         }
         END { if (in_block) exit 4 }
-    ' "$resolved")"
-    local rc=$?
+    ' "$resolved")" || rc=$?
     if [ "$rc" -eq 3 ] || [ "$rc" -eq 4 ]; then
         die "config_block_remove: malformed block for $name in $resolved"
     elif [ "$rc" -ne 0 ]; then

@@ -5,7 +5,7 @@
 
 moonraker_query() {
     local endpoint="$1"
-    curl -fsS --max-time 8 --max-filesize 1048576 "${MOONRAKER_HOST}${endpoint}"
+    curl -fsS --max-time 8 --max-filesize 1048576 "${MOONRAKER_HOST:-http://localhost:7125}${endpoint}"
 }
 
 _kpi_klipper_home() {

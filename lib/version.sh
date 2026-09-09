@@ -55,7 +55,7 @@ version_stamp() {
     fi
     trap 'rm -f "$tmp"; if [ -n "$_kpi_prev_trap_cmd" ]; then eval "$_kpi_prev_trap_cmd"; fi' EXIT
 
-    tmp="$(mktemp "$(dirname "$resolved").kpi.XXXXXX")" || die "version_stamp: mktemp failed"
+    tmp="$(mktemp "$(dirname "$resolved")/.kpi.XXXXXX")" || die "version_stamp: mktemp failed"
     echo "$sha" > "$tmp" || die "version_stamp: write failed: $tmp"
     if [ -f "$resolved" ]; then
         _kpi_version_chmod_reference "$resolved" "$tmp" \

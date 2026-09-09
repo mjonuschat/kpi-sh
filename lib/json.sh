@@ -21,6 +21,7 @@ _kpi_ensure_python() {
 json_get() {
     _kpi_ensure_python
 
+    local rc=0
     "$_KPI_PYTHON" -c '
 import sys, json
 
@@ -46,8 +47,7 @@ elif isinstance(cur, bool):
 else:
     print(cur)
 sys.exit(0)
-' "$@"
-    local rc=$?
+' "$@" || rc=$?
     if [ "$rc" -eq 2 ]; then
         die "json_get: malformed input JSON"
     fi
