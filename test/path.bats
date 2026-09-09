@@ -67,7 +67,7 @@ source "$PWD/lib/path.sh"
 script_dir
 EOF
     chmod +x "$KPI_TEST_TMPDIR/entry/main.sh"
-    run "$KPI_TEST_TMPDIR/entry/main.sh"
+    run bash "$KPI_TEST_TMPDIR/entry/main.sh"
     assert_success
     assert_output "$KPI_TEST_TMPDIR/entry"
 }
@@ -87,7 +87,7 @@ source "$KPI_TEST_TMPDIR/entry/helper.sh"
 outer
 EOF
     chmod +x "$KPI_TEST_TMPDIR/entry/main.sh"
-    run "$KPI_TEST_TMPDIR/entry/main.sh"
+    run bash "$KPI_TEST_TMPDIR/entry/main.sh"
     assert_success
     assert_output "$KPI_TEST_TMPDIR/entry"
 }
