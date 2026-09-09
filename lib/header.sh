@@ -3,6 +3,8 @@
 # "header.sh — Library Init" for the full rationale behind every check below.
 
 if declare -F _kpi_init_done >/dev/null 2>&1; then
+    # shellcheck disable=SC2317  # reached only when sourced (return fails
+    # and falls through to exit) when this file is executed directly
     return 0 2>/dev/null || exit 0
 fi
 

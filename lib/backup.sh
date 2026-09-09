@@ -53,6 +53,9 @@ backup_dir_timestamped() {
     # Shadowing `trap` as a function while evaluating that string hands us
     # its bare command text instead, which we can actually execute here.
     if [ -n "$_kpi_prev_exit" ]; then
+        # shellcheck disable=SC2329  # invoked indirectly: eval-ing
+        # "$_kpi_prev_exit" (a `trap -- '...' EXIT` string) calls this
+        # shadowed `trap` with the captured command as $2.
         _kpi_prev_exit_cmd="$(trap() { printf '%s' "$2"; }; eval "$_kpi_prev_exit")"
     fi
 
@@ -73,7 +76,8 @@ backup_dir_timestamped() {
         log "backup_dir_timestamped: source does not exist, creating empty backup: $source"
     fi
 
-    local base="$backup_root/$(date +%Y_%m_%d-%H%M%S)"
+    local base
+    base="$backup_root/$(date +%Y_%m_%d-%H%M%S)"
     local final="$base"
     local n=2
     while [ -e "$final" ]; do
