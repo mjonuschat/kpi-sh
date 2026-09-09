@@ -175,7 +175,21 @@ EOF
 exit 1
 EOF
     chmod +x "$fake_bin/mktemp"
-    PATH="$fake_bin:$PATH" run config_block_add "$cfg" newblock "new content"
+    # A fresh process, not `run config_block_add` (a same-shell subshell):
+    # the latter inherits bats' own `bats_teardown_trap` EXIT trap, which
+    # our die path then genuinely re-invokes (per the trap-execution fix
+    # above) — correct for a real caller, but it runs bats' internal
+    # completion protocol out of turn and corrupts its test count.
+    script="$KPI_TEST_TMPDIR/run-mktemp-fail.sh"
+    cat > "$script" <<EOF
+#!/bin/bash
+source "$PWD/lib/header.sh"
+source "$PWD/lib/log.sh"
+source "$PWD/lib/config_block.sh"
+PATH="$fake_bin:\$PATH" config_block_add "$cfg" newblock "new content"
+EOF
+    chmod +x "$script"
+    run bash "$script"
     assert_failure
     assert_equal "$(cat "$cfg")" "$before"
     run bash -c "ls -A '$(dirname "$cfg")' | grep -c '\.kpi\.'"
@@ -192,7 +206,17 @@ EOF
 exit 1
 EOF
     chmod +x "$fake_bin/mv"
-    PATH="$fake_bin:$PATH" run config_block_add "$cfg" newblock "new content"
+    # Fresh process — same reason as the mktemp-failure test above.
+    script="$KPI_TEST_TMPDIR/run-mv-fail.sh"
+    cat > "$script" <<EOF
+#!/bin/bash
+source "$PWD/lib/header.sh"
+source "$PWD/lib/log.sh"
+source "$PWD/lib/config_block.sh"
+PATH="$fake_bin:\$PATH" config_block_add "$cfg" newblock "new content"
+EOF
+    chmod +x "$script"
+    run bash "$script"
     assert_failure
     assert_equal "$(cat "$cfg")" "$before"
 }
@@ -212,6 +236,29 @@ EOF
     chmod +x "$script"
     run bash "$script"
     assert_output --partial "REACHED_AFTER_ADD"
+}
+
+@test "a pre-existing EXIT trap actually runs (not just re-registers) when a write fails" {
+    touch "$cfg"
+    fake_bin="$KPI_TEST_TMPDIR/bin"; mkdir -p "$fake_bin"
+    cat > "$fake_bin/mktemp" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+    chmod +x "$fake_bin/mktemp"
+    script="$KPI_TEST_TMPDIR/run-trap-fires-on-die.sh"
+    cat > "$script" <<EOF
+#!/bin/bash
+source "$PWD/lib/header.sh"
+source "$PWD/lib/log.sh"
+source "$PWD/lib/config_block.sh"
+trap 'echo "CONSUMER_CLEANUP_RAN"' EXIT
+PATH="$fake_bin:\$PATH" config_block_add "$cfg" myplugin "content"
+EOF
+    chmod +x "$script"
+    run bash "$script"
+    assert_failure
+    assert_output --partial "CONSUMER_CLEANUP_RAN"
 }
 
 @test "config_block_remove dies on an invalid name, same as add/ensure" {

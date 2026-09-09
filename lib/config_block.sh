@@ -40,9 +40,18 @@ _kpi_config_block_write() {
     # Args: resolved_file, new_content (already has trailing newline)
     local resolved="$1" new_content="$2"
     local tmp=""
-    local _kpi_prev_trap
+    local _kpi_prev_trap _kpi_prev_trap_cmd=""
     _kpi_prev_trap="$(trap -p EXIT)"
-    trap 'rm -f "$tmp"; ${_kpi_prev_trap:+eval "$_kpi_prev_trap"}' EXIT
+    # `eval "$_kpi_prev_trap"` (the full `trap -- '...' EXIT` string) only
+    # re-registers the trap — a no-op if it fires from inside our own EXIT
+    # trap, since the shell is already exiting and an EXIT trap fires once.
+    # Shadow `trap` as a function so evaluating that string hands us its
+    # bare command text ($2) instead, which we can actually execute on the
+    # abnormal-exit path below.
+    if [ -n "$_kpi_prev_trap" ]; then
+        _kpi_prev_trap_cmd="$(trap() { printf '%s' "$2"; }; eval "$_kpi_prev_trap")"
+    fi
+    trap 'rm -f "$tmp"; if [ -n "$_kpi_prev_trap_cmd" ]; then eval "$_kpi_prev_trap_cmd"; fi' EXIT
 
     tmp="$(mktemp "$(dirname "$resolved").kpi.XXXXXX")" || die "config_block: mktemp failed for $resolved"
     printf '%s' "$new_content" > "$tmp" || die "config_block: write to temp file failed: $tmp"
@@ -162,11 +171,11 @@ config_block_remove() {
 
     local new_content
     new_content="$(awk -v start="$start" -v end="$end" '
-        BEGIN { in_block = 0; found_end = 0 }
+        BEGIN { in_block = 0 }
         {
             if (!in_block && $0 == start) { in_block = 1; next }
             if (in_block) {
-                if ($0 == end) { in_block = 0; found_end = 1; next }
+                if ($0 == end) { in_block = 0; next }
                 if ($0 ~ /^# --- .+ ---$/) {
                     print "config_block_remove: foreign sentinel inside block: " $0 > "/dev/stderr"
                     exit 3
