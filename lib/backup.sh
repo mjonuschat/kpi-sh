@@ -54,7 +54,7 @@ backup_dir_timestamped() {
     # Shadowing `trap` as a function while evaluating that string hands us
     # its bare command text instead, which we can actually execute here.
     if [ -n "$_kpi_prev_exit" ]; then
-        # shellcheck disable=SC2329  # invoked indirectly: eval-ing
+        # shellcheck disable=SC2317,SC2329  # invoked indirectly: eval-ing
         # "$_kpi_prev_exit" (a `trap -- '...' EXIT` string) calls this
         # shadowed `trap` with the captured command as $2.
         _kpi_prev_exit_cmd="$(trap() { printf '%s' "$2"; }; eval "$_kpi_prev_exit")"
