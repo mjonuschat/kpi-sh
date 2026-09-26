@@ -16,7 +16,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Build kpi.sh and checksum
-        run: make checksum
+        run: make VERSION="$GITHUB_REF_NAME" checksum
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

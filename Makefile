@@ -1,4 +1,4 @@
-VERSION ?= $(shell git describe --tags --always --long --dirty)
+VERSION ?= $(shell git describe --tags --always --dirty)
 
 MODULES = lib/header.sh \
           lib/log.sh \

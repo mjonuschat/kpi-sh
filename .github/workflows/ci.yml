@@ -19,24 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        bash-version: ["4.0", "5.x"]
+        bash-version: ["4.0", "5.2"]
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Run unit tests (bash ${{ matrix.bash-version }})
         run: |
-          if [ "${{ matrix.bash-version }}" = "4.0" ]; then
-            # bash:4.0 is a minimal Alpine-based image with neither git nor
-            # python3 — both are required by git.bats/json.bats/klipper.bats,
-            # so install them (via apk, not apt-get) before running the suite.
-            docker run --rm -v "$PWD:/work" -w /work bash:4.0 bash -c "
-              apk add --no-cache git python3
-              test/bats-core/bin/bats \$(ls test/*.bats | grep -v integration.bats)
-            "
-          else
-            make test-unit
-          fi
+          # The bash images are minimal Alpine: no git or python3 (needed by
+          # git/json/klipper tests), busybox instead of GNU coreutils (Pi
+          # hosts have GNU), and bash only at /usr/local/bin (test fakes use
+          # #!/bin/bash). Run as non-root: permission-based cases skip as root.
+          docker run --rm -v "$PWD:/work" -w /work bash:${{ matrix.bash-version }} bash -c "
+            apk add --no-cache git python3 coreutils
+            ln -sf /usr/local/bin/bash /bin/bash
+            adduser -D tester
+            su tester -s /bin/bash -c 'test/bats-core/bin/bats \$(ls test/*.bats | grep -v integration.bats)'
+          "
       - name: Build kpi.sh
         run: make kpi.sh
       - name: Verify clean rebuild
