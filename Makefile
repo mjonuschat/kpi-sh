@@ -15,21 +15,23 @@ MODULES = lib/header.sh \
           lib/klipper.sh
 
 BATS = test/bats-core/bin/bats
+OUT = dist/kpi.sh
 
 .PHONY: kpi.sh
 kpi.sh: $(MODULES)
-	@echo "#!/bin/bash" > $@
-	@echo "# --- kpi.sh $(VERSION) ---" >> $@
-	@echo "# Klipper Plugin Installer library" >> $@
-	@echo "# https://github.com/mjonuschat/kpi-sh" >> $@
+	@mkdir -p $(dir $(OUT))
+	@echo "#!/bin/bash" > $(OUT)
+	@echo "# --- kpi.sh $(VERSION) ---" >> $(OUT)
+	@echo "# Klipper Plugin Installer library" >> $(OUT)
+	@echo "# https://github.com/mjonuschat/kpi-sh" >> $(OUT)
 	@for f in $^; do \
-	    echo "" >> $@; \
-	    echo "# --- $$(basename $$f) ---" >> $@; \
-	    grep -v '^#!/bin/bash' "$$f" >> $@; \
+	    echo "" >> $(OUT); \
+	    echo "# --- $$(basename $$f) ---" >> $(OUT); \
+	    grep -v '^#!/bin/bash' "$$f" >> $(OUT); \
 	done
-	@echo "" >> $@
-	@echo "# --- /kpi.sh ---" >> $@
-	@chmod +x $@
+	@echo "" >> $(OUT)
+	@echo "# --- /kpi.sh ---" >> $(OUT)
+	@chmod +x $(OUT)
 
 .PHONY: test
 test:
@@ -49,8 +51,8 @@ shellcheck:
 
 .PHONY: checksum
 checksum: kpi.sh
-	sha256sum kpi.sh > kpi.sh.sha256
+	cd $(dir $(OUT)) && sha256sum kpi.sh > kpi.sh.sha256
 
 .PHONY: clean
 clean:
-	rm -f kpi.sh kpi.sh.sha256
+	rm -rf $(dir $(OUT))

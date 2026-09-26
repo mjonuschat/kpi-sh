@@ -1,6 +1,6 @@
 #!/bin/bash
 set -eu
-source "$(dirname "${BASH_SOURCE[0]}")/../../kpi.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../dist/kpi.sh"
 
 REPO_URL="https://github.com/example/full-plugin.git"
 PLUGIN_PATH="${HOME}/full-plugin"

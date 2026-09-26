@@ -41,10 +41,10 @@ jobs:
         run: make kpi.sh
       - name: Verify clean rebuild
         run: |
-          sha1="$(sha256sum kpi.sh)"
-          rm kpi.sh
+          sha1="$(sha256sum dist/kpi.sh)"
+          make clean
           make kpi.sh
-          sha2="$(sha256sum kpi.sh)"
+          sha2="$(sha256sum dist/kpi.sh)"
           [ "$sha1" = "$sha2" ] || (echo "rebuild is not clean" && exit 1)
       - name: Run integration tests
         run: make test-integration

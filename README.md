@@ -229,8 +229,8 @@ functions of its own.
 ## Building and testing
 
 ```bash
-make kpi.sh          # build the concatenated library
-make checksum        # build kpi.sh and kpi.sh.sha256
+make kpi.sh          # build the concatenated library into dist/kpi.sh
+make checksum        # also write dist/kpi.sh.sha256
 make test            # full bats suite (unit + integration)
 make test-unit       # unit tests only
 make test-integration

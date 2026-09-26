@@ -1,6 +1,6 @@
 #!/bin/bash
 set -eu
-source "$(dirname "${BASH_SOURCE[0]}")/../../kpi.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../dist/kpi.sh"
 
 require_not_root
 require_systemd_service klipper
