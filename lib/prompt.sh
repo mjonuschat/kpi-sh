@@ -54,6 +54,7 @@ confirm_yn() {
 }
 
 select_from_dir() {
+    local -x LC_ALL=C
     local prompt="$1" dir="$2" glob="$3"
 
     local -a files=()

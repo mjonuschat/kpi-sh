@@ -44,8 +44,8 @@ link_safe() {
         allow_dangling=1
         shift
     fi
-    local target="$1"
-    local link_name="$2"
+    local target link_name="$2"
+    target="$(abspath "$1")" || die "link_safe: cannot resolve target: $1"
 
     if [ "$allow_dangling" -eq 0 ] && [ ! -e "$target" ]; then
         die "link_safe: target does not exist: $target"
@@ -61,10 +61,12 @@ link_safe() {
             die "link_safe: refusing to overwrite non-symlink: $link_name"
             ;;
         symlink)
-            rm -f "$link_name"
+            rm -f "$link_name" || die "link_safe: cannot remove existing symlink: $link_name"
             ;;
     esac
 
-    mkdir -p "$(dirname "$link_name")"
-    ln -s "$target" "$link_name"
+    local parent
+    parent="$(dirname "$link_name")"
+    mkdir -p "$parent" || die "link_safe: cannot create directory: $parent"
+    ln -s "$target" "$link_name" || die "link_safe: cannot create symlink: $link_name -> $target"
 }

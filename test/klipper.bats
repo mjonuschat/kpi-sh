@@ -106,6 +106,48 @@ EOF
     assert_equal "$status" 1
 }
 
+@test "check_no_active_print queries only print_stats.state" {
+    cat > "$fake_bin/curl" <<EOF
+#!/bin/bash
+printf '%s\n' "\$@" > "$KPI_TEST_TMPDIR/curl_args"
+echo '{"result":{"status":{"print_stats":{"state":"standby"}}}}'
+EOF
+    chmod +x "$fake_bin/curl"
+    MOONRAKER_HOST="http://localhost:7125"
+    PATH="$fake_bin:$PATH" run check_no_active_print
+    assert_success
+    run grep -Fx "http://localhost:7125/printer/objects/query?print_stats=state" "$KPI_TEST_TMPDIR/curl_args"
+    assert_success
+}
+
+@test "check_no_active_print returns 1 while paused" {
+    _install_fake_curl "{\"result\":{\"status\":{\"print_stats\":{\"state\":\"paused\"}}}}"
+    MOONRAKER_HOST="http://localhost:7125"
+    PATH="$fake_bin:$PATH" run check_no_active_print
+    assert_equal "$status" 1
+}
+
+@test "check_no_active_print returns 1 when print_stats is missing" {
+    _install_fake_curl "{\"result\":{\"status\":{}}}"
+    MOONRAKER_HOST="http://localhost:7125"
+    PATH="$fake_bin:$PATH" run check_no_active_print
+    assert_equal "$status" 1
+}
+
+@test "check_no_active_print returns 1 on an API error response" {
+    _install_fake_curl "{\"error\":{\"code\":503,\"message\":\"Klippy Host not connected\"}}" 22
+    MOONRAKER_HOST="http://localhost:7125"
+    PATH="$fake_bin:$PATH" run check_no_active_print
+    assert_equal "$status" 1
+}
+
+@test "check_no_active_print returns 1 when Moonraker is unreachable" {
+    _install_fake_curl "" 7
+    MOONRAKER_HOST="http://localhost:7125"
+    PATH="$fake_bin:$PATH" run check_no_active_print
+    assert_equal "$status" 1
+}
+
 @test "moonraker_query prints the response body and returns curl's exit code" {
     _install_fake_curl "some body" 0
     MOONRAKER_HOST="http://localhost:7125"

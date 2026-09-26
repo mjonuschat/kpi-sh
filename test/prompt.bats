@@ -112,3 +112,20 @@ teardown() {
     assert_equal "$status" 1
     exec 8<&-
 }
+
+@test "select_from_dir sorts under LC_ALL=C without changing the caller's locale" {
+    mkdir -p "$KPI_TEST_TMPDIR/opts" "$KPI_TEST_TMPDIR/bin"
+    touch "$KPI_TEST_TMPDIR/opts/a.cfg"
+    real_sort="$(command -v sort)"
+    cat > "$KPI_TEST_TMPDIR/bin/sort" <<EOF
+#!/bin/bash
+echo "\${LC_ALL-unset}" > "$KPI_TEST_TMPDIR/sort_locale"
+exec "$real_sort" "\$@"
+EOF
+    chmod +x "$KPI_TEST_TMPDIR/bin/sort"
+    export LC_ALL=en_US.UTF-8
+    _KPI_INPUT_FD=0
+    PATH="$KPI_TEST_TMPDIR/bin:$PATH" select_from_dir "pick" "$KPI_TEST_TMPDIR/opts" "*.cfg" <<< "1" >/dev/null
+    assert_equal "$(cat "$KPI_TEST_TMPDIR/sort_locale")" "C"
+    assert_equal "$LC_ALL" "en_US.UTF-8"
+}

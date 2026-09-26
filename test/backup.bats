@@ -220,6 +220,37 @@ EOF
     assert_link_exist "$dir/unmanaged_link"
 }
 
+@test "backup_scrub_symlinks removes links under a prefix subdirectory but keeps a _old sibling" {
+    dir="$KPI_TEST_TMPDIR/backup"; mkdir -p "$dir"
+    prefix="$KPI_TEST_TMPDIR/klippain_config"; mkdir -p "$prefix/sub" "${prefix}_old"
+    ln -s "$prefix/sub" "$dir/sub_link"
+    ln -s "${prefix}_old" "$dir/old_link"
+    backup_scrub_symlinks "$dir" "$prefix"
+    assert_file_not_exist "$dir/sub_link"
+    assert_link_exist "$dir/old_link"
+}
+
+@test "backup_scrub_symlinks keeps relative links even if they resolve under prefix" {
+    dir="$KPI_TEST_TMPDIR/backup"; mkdir -p "$dir/managed"
+    ln -s managed "$dir/rel_link"
+    backup_scrub_symlinks "$dir" "$dir"
+    assert_link_exist "$dir/rel_link"
+}
+
+@test "backup_scrub_symlinks canonicalizes a symlinked prefix" {
+    dir="$KPI_TEST_TMPDIR/backup"; mkdir -p "$dir"
+    real="$KPI_TEST_TMPDIR/real_config"; mkdir -p "$real"
+    ln -s "$real" "$KPI_TEST_TMPDIR/alias_config"
+    ln -s "$real" "$dir/managed_link"
+    backup_scrub_symlinks "$dir" "$KPI_TEST_TMPDIR/alias_config"
+    assert_file_not_exist "$dir/managed_link"
+}
+
+@test "backup_scrub_symlinks dies when backup_dir does not exist" {
+    run backup_scrub_symlinks "$KPI_TEST_TMPDIR/no/such/backup" "$KPI_TEST_TMPDIR"
+    assert_failure
+}
+
 @test "backup_scrub_symlinks dies on an unresolvable prefix" {
     dir="$KPI_TEST_TMPDIR/backup"; mkdir -p "$dir"
     run backup_scrub_symlinks "$dir" "$KPI_TEST_TMPDIR/no/such/prefix"

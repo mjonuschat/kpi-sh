@@ -12,6 +12,10 @@ _kpi_klipper_home() {
     if [ -z "${HOME:-}" ]; then
         die "discover_klipper_env: \$HOME is unset"
     fi
+    # GNU realpath accepts a missing last component, so check existence first.
+    if [ ! -d "$HOME" ]; then
+        die "discover_klipper_env: \$HOME does not resolve to a real directory: $HOME"
+    fi
     realpath "$HOME" 2>/dev/null || die "discover_klipper_env: \$HOME does not resolve to a real directory: $HOME"
 }
 
@@ -98,7 +102,7 @@ check_no_active_print() {
     # unreachable Moonraker or a missing field must not abort a
     # consumer's set -e script here (the documented "unreachable -> 1"
     # outcome needs to be reached, not skipped by an early script exit).
-    state="$(moonraker_query /printer/objects/query?print_stats 2>/dev/null | json_get result status print_stats state 2>/dev/null)" || true
+    state="$(moonraker_query "/printer/objects/query?print_stats=state" 2>/dev/null | json_get result status print_stats state 2>/dev/null)" || true
     case "$state" in
         standby | complete | cancelled | error) return 0 ;;
         *) return 1 ;;

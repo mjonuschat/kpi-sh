@@ -10,9 +10,16 @@ teardown() {
     common_teardown
 }
 
-@test "sourcing header.sh sets LC_ALL to C" {
+@test "sourcing header.sh leaves the consumer's LC_ALL alone" {
+    export LC_ALL=en_US.UTF-8
     source lib/header.sh
-    assert_equal "$LC_ALL" "C"
+    assert_equal "$LC_ALL" "en_US.UTF-8"
+}
+
+@test "sourcing header.sh does not set LC_ALL when the consumer has none" {
+    unset LC_ALL
+    source lib/header.sh
+    assert [ -z "${LC_ALL+x}" ]
 }
 
 @test "sourcing header.sh defines the _kpi_init_done marker" {

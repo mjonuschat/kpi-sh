@@ -87,7 +87,75 @@ _kpi_config_block_resolve_existing() {
     fi
 }
 
+# Prints $resolved with every block named $name removed or, when a
+# replacement is given, the first one's body swapped for it and any later
+# duplicates removed. Dies on a malformed block.
+_kpi_config_block_rewrite() {
+    local caller="$1" resolved="$2" name="$3"
+    local start="# --- $name ---" end="# --- /$name ---"
+    local replace=0 replacement=""
+    if [ "$#" -ge 4 ]; then
+        replace=1
+        replacement="$4"
+    fi
+
+    local out rc=0
+    # The replacement goes through ENVIRON: awk -v would interpret backslash
+    # escapes in it.
+    out="$(KPI_REPLACEMENT="$replacement" awk -v start="$start" -v end="$end" -v replace="$replace" '
+        BEGIN { in_block = 0; done = 0 }
+        {
+            if (!in_block && $0 == start) {
+                in_block = 1
+                if (replace && !done) { print start; print ENVIRON["KPI_REPLACEMENT"]; print end }
+                done = 1
+                next
+            }
+            if (in_block) {
+                if ($0 == end) { in_block = 0; next }
+                if ($0 ~ /^# --- .+ ---$/) {
+                    print "config_block: foreign sentinel inside block: " $0 > "/dev/stderr"
+                    exit 3
+                }
+                next
+            }
+            print
+        }
+        END { if (in_block) exit 4 }
+    ' "$resolved")" || rc=$?
+    if [ "$rc" -eq 3 ] || [ "$rc" -eq 4 ]; then
+        die "$caller: malformed block for $name in $resolved"
+    elif [ "$rc" -ne 0 ]; then
+        # Any other nonzero awk exit (e.g. a read failure) must stop here
+        # rather than feed partial output into the atomic write.
+        die "$caller: failed to process $resolved (awk exit $rc)"
+    fi
+    printf '%s' "$out"
+}
+
+# Replaces the body of an existing block in place, or no-ops when it
+# already matches. Returns 1 if the block is absent.
+_kpi_config_block_update() {
+    local caller="$1" resolved="$2" name="$3" content="$4"
+    local grep_rc=0
+    grep -qxF "# --- $name ---" "$resolved" || grep_rc=$?
+    if [ "$grep_rc" -eq 1 ]; then
+        return 1
+    elif [ "$grep_rc" -ne 0 ]; then
+        die "$caller: cannot read $resolved (grep exit $grep_rc)"
+    fi
+
+    local existing_content new_content
+    existing_content="$(cat "$resolved")" || die "$caller: cannot read $resolved"
+    new_content="$(_kpi_config_block_rewrite "$caller" "$resolved" "$name" "$content")" \
+        || die "$caller: cannot update block $name in $resolved"
+    if [ "$new_content" != "$existing_content" ]; then
+        _kpi_config_block_write "$resolved" "$new_content"$'\n'
+    fi
+}
+
 config_block_add() {
+    local -x LC_ALL=C
     local file="$1" name="$2" content="$3"
     _kpi_config_block_check_name "$name" config_block_add
     if printf '%s\n' "$content" | grep -qE '^# --- .+ ---$'; then
@@ -100,10 +168,10 @@ config_block_add() {
         die "config_block_add: file does not exist: $file"
     fi
 
-    local start="# --- $name ---"
-    if grep -qxF "$start" "$resolved"; then
+    if _kpi_config_block_update config_block_add "$resolved" "$name" "$content"; then
         return 0
     fi
+    local start="# --- $name ---"
 
     # Checked explicitly: an unreadable existing file (e.g. permission
     # revoked after resolve) would otherwise make this `cat` fail
@@ -118,6 +186,7 @@ config_block_add() {
 }
 
 config_block_ensure() {
+    local -x LC_ALL=C
     local file="$1" name="$2" content="$3"
     _kpi_config_block_check_name "$name" config_block_ensure
     if printf '%s\n' "$content" | grep -qE '^# --- .+ ---$'; then
@@ -127,21 +196,22 @@ config_block_ensure() {
     # A dangling symlink at $file is removed first so we don't try to
     # write through a broken link.
     if [ -L "$file" ] && [ ! -e "$file" ]; then
-        rm -f "$file"
+        rm -f "$file" || die "config_block_ensure: cannot remove dangling symlink: $file"
     fi
 
     local resolved
     resolved="$(_kpi_config_block_resolve_existing "$file")"
     local existing=""
     if [ -n "$resolved" ]; then
-        if grep -qxF "# --- $name ---" "$resolved"; then
+        if _kpi_config_block_update config_block_ensure "$resolved" "$name" "$content"; then
             return 0
         fi
         local existing_content
         existing_content="$(cat "$resolved")" || die "config_block_ensure: cannot read $resolved"
         existing="$existing_content"$'\n'
     else
-        resolved="$(_kpi_config_block_realpath_m "$file")"
+        resolved="$(_kpi_config_block_realpath_m "$file")" \
+            || die "config_block_ensure: cannot resolve $file"
     fi
 
     local new_content
@@ -150,6 +220,7 @@ config_block_ensure() {
 }
 
 config_block_remove() {
+    local -x LC_ALL=C
     local file="$1" name="$2"
     _kpi_config_block_check_name "$name" config_block_remove
     local resolved
@@ -158,46 +229,20 @@ config_block_remove() {
         return 0
     fi
 
-    local start="# --- $name ---"
-    local end="# --- /$name ---"
     # Distinguish "genuinely not found" (grep exit 1) from "couldn't even
     # read the file" (any other nonzero) — `if ! grep ...` alone treats a
     # permission error identically to "not found" and would silently
     # no-op instead of ever reaching the failure checks below.
     local grep_rc=0
-    grep -qxF "$start" "$resolved" || grep_rc=$?
+    grep -qxF "# --- $name ---" "$resolved" || grep_rc=$?
     if [ "$grep_rc" -eq 1 ]; then
         return 0
     elif [ "$grep_rc" -ne 0 ]; then
         die "config_block_remove: cannot read $resolved (grep exit $grep_rc)"
     fi
 
-    local new_content rc=0
-    new_content="$(awk -v start="$start" -v end="$end" '
-        BEGIN { in_block = 0 }
-        {
-            if (!in_block && $0 == start) { in_block = 1; next }
-            if (in_block) {
-                if ($0 == end) { in_block = 0; next }
-                if ($0 ~ /^# --- .+ ---$/) {
-                    print "config_block_remove: foreign sentinel inside block: " $0 > "/dev/stderr"
-                    exit 3
-                }
-                next
-            }
-            print
-        }
-        END { if (in_block) exit 4 }
-    ' "$resolved")" || rc=$?
-    if [ "$rc" -eq 3 ] || [ "$rc" -eq 4 ]; then
-        die "config_block_remove: malformed block for $name in $resolved"
-    elif [ "$rc" -ne 0 ]; then
-        # Any other nonzero awk exit (e.g. a read failure — permission
-        # revoked on $resolved after resolve) must also stop here.
-        # Checking only 3/4 and letting everything else fall through
-        # would feed incomplete/wrong output into the atomic write below.
-        die "config_block_remove: failed to process $resolved (awk exit $rc)"
-    fi
-
+    local new_content
+    new_content="$(_kpi_config_block_rewrite config_block_remove "$resolved" "$name")" \
+        || die "config_block_remove: cannot remove block $name from $resolved"
     _kpi_config_block_write "$resolved" "$new_content"$'\n'
 }

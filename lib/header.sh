@@ -8,8 +8,6 @@ if declare -F _kpi_init_done >/dev/null 2>&1; then
     return 0 2>/dev/null || exit 0
 fi
 
-export LC_ALL=C
-
 if ((BASH_VERSINFO[0] < 4)); then
     echo "error: kpi-sh requires Bash 4.0 or newer (found ${BASH_VERSION})" >&2
     exit 1

@@ -17,6 +17,7 @@ require_systemd_service() {
 }
 
 require_python_min() {
+    local -x LC_ALL=C
     local interpreter="$1" major="$2" minor="$3"
     local version
     version="$("$interpreter" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)" \

@@ -6,6 +6,7 @@ setup() {
     common_setup
     source lib/header.sh
     source lib/log.sh
+    source lib/path.sh
     source lib/symlink.sh
 }
 
@@ -102,4 +103,12 @@ teardown() {
     touch "$KPI_TEST_TMPDIR/target"
     link_safe "$KPI_TEST_TMPDIR/target" "$KPI_TEST_TMPDIR/new/parent/link"
     assert_equal "$(readlink "$KPI_TEST_TMPDIR/new/parent/link")" "$KPI_TEST_TMPDIR/target"
+}
+
+@test "link_safe resolves a relative target to an absolute link" {
+    mkdir -p "$KPI_TEST_TMPDIR/src" "$KPI_TEST_TMPDIR/dest"
+    touch "$KPI_TEST_TMPDIR/src/target"
+    (cd "$KPI_TEST_TMPDIR" && link_safe src/target dest/link)
+    assert_equal "$(readlink "$KPI_TEST_TMPDIR/dest/link")" "$KPI_TEST_TMPDIR/src/target"
+    assert_file_exist "$KPI_TEST_TMPDIR/dest/link"
 }

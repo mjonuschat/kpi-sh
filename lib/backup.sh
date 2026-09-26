@@ -30,8 +30,9 @@ backup_dir_timestamped() {
     if [ -d "$source" ]; then
         have_source=1
         local rsource rroot
-        rsource="$(realpath "$source")"
-        rroot="$(_kpi_backup_realpath_m "$backup_root")"
+        rsource="$(realpath "$source")" || die "backup_dir_timestamped: cannot resolve $source"
+        rroot="$(_kpi_backup_realpath_m "$backup_root")" \
+            || die "backup_dir_timestamped: cannot resolve $backup_root"
         case "$rroot/" in
             "$rsource/"*) die "backup_dir_timestamped: backup_root is inside source" ;;
         esac
@@ -117,16 +118,29 @@ backup_dir_timestamped() {
 }
 
 backup_scrub_symlinks() {
+    local -x LC_ALL=C
     local backup_dir="$1" prefix="$2"
     local rprefix
     rprefix="$(realpath "$prefix")" || die "backup_scrub_symlinks: cannot resolve prefix: $prefix"
+    # find's exit status is lost inside `< <(...)`, so check up front.
+    if [ ! -d "$backup_dir" ] || [ ! -r "$backup_dir" ]; then
+        die "backup_scrub_symlinks: cannot read $backup_dir"
+    fi
 
-    local link rtarget
+    local link raw rtarget
     while IFS= read -r -d '' link; do
-        rtarget="$(realpath "$link" 2>/dev/null)" || continue  # dangling: leave untouched
+        raw="$(readlink "$link")" || die "backup_scrub_symlinks: cannot read link: $link"
+        # A relative link resolves against the backup dir, not where it was
+        # copied from, so its real target is unknowable here.
+        [[ "$raw" == /* ]] || continue
+        # GNU realpath resolves a dangling link whose last component is
+        # missing; BSD and busybox fail. Skip dangling links explicitly.
+        [ -e "$link" ] || continue
+        rtarget="$(realpath "$link")" || die "backup_scrub_symlinks: cannot resolve $link"
         case "$rtarget" in
-            "$rprefix") rm -f "$link" ;;
-            "$rprefix"/*) rm -f "$link" ;;
+            "$rprefix" | "$rprefix"/*)
+                rm -f "$link" || die "backup_scrub_symlinks: cannot remove $link"
+                ;;
         esac
     done < <(find "$backup_dir" -type l -print0)
 }

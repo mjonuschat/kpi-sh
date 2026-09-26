@@ -30,11 +30,41 @@ teardown() {
     assert_success
 }
 
-@test "config_block_add is a no-op when the block already exists" {
+@test "config_block_add is a no-op when the block exists with identical content" {
     touch "$cfg"
     config_block_add "$cfg" myplugin "v1"
+    before_inode="$(ls -i "$cfg")"
     before="$(cat "$cfg")"
-    config_block_add "$cfg" myplugin "v2"
+    config_block_add "$cfg" myplugin "v1"
+    assert_equal "$(cat "$cfg")" "$before"
+    assert_equal "$(ls -i "$cfg")" "$before_inode"
+}
+
+@test "config_block_add replaces changed content in place" {
+    printf '[server]\n# --- myplugin ---\nold line 1\nold line 2\n# --- /myplugin ---\n[tail]\n# --- other ---\nkeep\n# --- /other ---\n' > "$cfg"
+    config_block_add "$cfg" myplugin "new line"
+    assert_equal "$(cat "$cfg")" "$(printf '[server]\n# --- myplugin ---\nnew line\n# --- /myplugin ---\n[tail]\n# --- other ---\nkeep\n# --- /other ---')"
+}
+
+@test "config_block_ensure replaces changed content in place" {
+    printf 'head\n# --- myplugin ---\nold\n# --- /myplugin ---\ntail\n' > "$cfg"
+    config_block_ensure "$cfg" myplugin "new"
+    assert_equal "$(cat "$cfg")" "$(printf 'head\n# --- myplugin ---\nnew\n# --- /myplugin ---\ntail')"
+}
+
+@test "config_block_add dies instead of replacing an unterminated block" {
+    printf '# --- myplugin ---\nold\n' > "$cfg"
+    before="$(cat "$cfg")"
+    run config_block_add "$cfg" myplugin "new"
+    assert_failure
+    assert_equal "$(cat "$cfg")" "$before"
+}
+
+@test "config_block_add dies instead of replacing a block with a foreign sentinel inside" {
+    printf '# --- myplugin ---\n# --- other ---\nx\n# --- /other ---\n# --- /myplugin ---\n' > "$cfg"
+    before="$(cat "$cfg")"
+    run config_block_add "$cfg" myplugin "new"
+    assert_failure
     assert_equal "$(cat "$cfg")" "$before"
 }
 
@@ -305,4 +335,13 @@ EOF
     # partially rewrite the file before dying and this would go unnoticed
     # without an explicit content check.
     assert_equal "$(cat "$cfg")" "$original"
+}
+
+@test "config_block functions do not change the caller's LC_ALL" {
+    export LC_ALL=en_US.UTF-8
+    touch "$cfg"
+    config_block_add "$cfg" myplugin "a"
+    config_block_add "$cfg" myplugin "b"
+    config_block_remove "$cfg" myplugin
+    assert_equal "$LC_ALL" "en_US.UTF-8"
 }

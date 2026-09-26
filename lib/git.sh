@@ -23,7 +23,7 @@ _kpi_git_realpath_m() {
 git_ensure_clone() {
     local repo_url="$1" dest="$2" validator="${3:-}" ref="${4:-}"
     local resolved
-    resolved="$(_kpi_git_realpath_m "$dest")"
+    resolved="$(_kpi_git_realpath_m "$dest")" || die "git_ensure_clone: cannot resolve $dest"
 
     if [ -e "$resolved" ] && [ "$(ls -A "$resolved" 2>/dev/null)" ]; then
         if [ -d "$resolved/.git" ]; then

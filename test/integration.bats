@@ -20,7 +20,7 @@ teardown() {
 }
 
 @test "kpi.sh embeds a version sentinel" {
-    # No "v" prefix asserted: git describe --tags --always --long --dirty
+    # No "v" prefix asserted: git describe --tags --always --dirty
     # falls back to a bare abbreviated commit hash when the repo has no
     # tags yet (the normal state during initial development, before the
     # first "v1.0.0" release) — asserting a "v..." prefix here would fail

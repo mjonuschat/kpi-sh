@@ -34,9 +34,9 @@ version_stamp() {
 
     local resolved
     if [ -e "$dest_file" ]; then
-        resolved="$(realpath "$dest_file")"
+        resolved="$(realpath "$dest_file")" || die "version_stamp: cannot resolve $dest_file"
     else
-        resolved="$(_kpi_version_realpath_m "$dest_file")"
+        resolved="$(_kpi_version_realpath_m "$dest_file")" || die "version_stamp: cannot resolve $dest_file"
     fi
 
     local tmp=""
