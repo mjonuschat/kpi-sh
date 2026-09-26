@@ -6,6 +6,18 @@ REPO_URL="https://github.com/example/full-plugin.git"
 PLUGIN_PATH="${HOME}/full-plugin"
 BACKUP_PATH="${HOME}/full-plugin-backups"
 
+# Moonraker only reads moonraker.conf at startup, so the updater entry needs a
+# Moonraker restart too. The print check runs once, before either restart:
+# while one service restarts, the check against the other would fail closed.
+restart_services() {
+    if check_no_active_print; then
+        service_restart_if moonraker
+        service_restart_if klipper
+    else
+        log "Print active: restart moonraker and klipper once it finishes."
+    fi
+}
+
 main() {
     local action="${1:-install}"
     case "$action" in
@@ -30,18 +42,20 @@ managed_services: klipper
 primary_branch: main"
 
             version_stamp "$PLUGIN_PATH" "${HOME}/printer_data/config/.full-plugin-VERSION"
-            service_restart_if klipper check_no_active_print
+            restart_services
             log "full-plugin installed."
             ;;
         uninstall)
             discover_klipper_env
             remove_safe_link "${KLIPPER_PLUGINS_PATH}/plugin.py"
             config_block_remove "$MOONRAKER_CONFIG" "full_plugin"
-            service_restart_if klipper check_no_active_print
+            restart_services
             log "full-plugin uninstalled."
             ;;
         *) die "usage: install.sh [install|uninstall]" ;;
     esac
 }
 
-[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

@@ -124,7 +124,7 @@ One line per public function, grouped by the `lib/*.sh` module it lives in
 
 ### `header.sh` — Library Init
 
-Sourced first. Sets `LC_ALL=C`, enforces the Bash 4.0+ floor, and
+Sourced first. Enforces the Bash 4.0+ floor and
 lazily reserves an interactive input fd for `prompt.sh`. Exposes no public
 functions of its own.
 
@@ -149,7 +149,8 @@ functions of its own.
   refuses (returns 1) on a real file.
 - `link_safe [--allow-dangling] TARGET LINK_NAME` — creates/replaces a
   symlink at `LINK_NAME`, refusing to clobber a real file; creates
-  `LINK_NAME`'s parent directory if needed.
+  `LINK_NAME`'s parent directory if needed. `TARGET` is resolved to an
+  absolute path, so every link it creates is absolute.
 
 ### `preflight.sh` — Preflight Checks
 
@@ -177,7 +178,9 @@ functions of its own.
 ### `config_block.sh` — Sentinel-Delimited Config Blocks
 
 - `config_block_add FILE NAME CONTENT` — appends a new
-  `# --- NAME ---`/`# --- /NAME ---` block; no-ops if it already exists.
+  `# --- NAME ---`/`# --- /NAME ---` block. If the block already exists,
+  its content is replaced in place (no-op when identical), so a reinstall
+  with a changed path or origin updates the config.
 - `config_block_ensure FILE NAME CONTENT` — like `config_block_add`, but
   also creates `FILE` if it doesn't exist yet.
 - `config_block_remove FILE NAME` — removes the named block; no-ops if
@@ -196,9 +199,9 @@ functions of its own.
   timestamped directory under `BACKUP_ROOT` via stage-then-rename, and
   prints the final path. Designed to be called as
   `dir="$(backup_dir_timestamped ...)"`.
-- `backup_scrub_symlinks BACKUP_DIR PREFIX` — removes symlinks inside
-  `BACKUP_DIR` that resolve under `PREFIX` (dangling symlinks are left
-  untouched).
+- `backup_scrub_symlinks BACKUP_DIR PREFIX` — removes absolute symlinks
+  inside `BACKUP_DIR` that resolve to `PREFIX` or under `PREFIX/`.
+  Relative and dangling symlinks are left untouched.
 
 ### `prompt.sh` — Interactive Prompts
 
@@ -223,8 +226,9 @@ functions of its own.
   `KLIPPY_PYTHON`, `KLIPPER_PLUGINS_PATH`, and `MOONRAKER_CONFIG` from
   Moonraker (when reachable) or hardcoded defaults under `$HOME`, without
   overwriting any of those variables the caller already set.
-- `check_no_active_print` — returns 0 if Klipper reports no active print
-  (or is unreachable), 1 otherwise.
+- `check_no_active_print` — returns 0 if Klipper reports an idle print
+  state (`standby`, `complete`, `cancelled`, `error`), 1 otherwise —
+  including when the state can't be read (fails closed).
 
 ## Building and testing
 
